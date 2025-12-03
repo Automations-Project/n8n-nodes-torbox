@@ -1,5 +1,5 @@
 {
-  "name": "n8n-nodes-httpbin",
+  "name": "n8n-nodes-torbox",
   "version": "0.1.0",
   "description": "",
   "keywords": [
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Automations-Project/n8n-nodes-httpbin.git"
+    "url": "https://github.com/Automations-Project/n8n-nodes-torbox.git"
   },
   "engines": {
     "node": ">=20.15"
@@ -34,10 +34,10 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/HttpBinApi.credentials.js"
+      "dist/credentials/TorBoxApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/HttpBin/HttpBin.node.js"
+      "dist/nodes/TorBox/TorBox.node.js"
     ]
   },
   "devDependencies": {
