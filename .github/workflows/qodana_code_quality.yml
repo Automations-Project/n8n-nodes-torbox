@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches: # Specify your branches here
-      - master # The 'main' branch
+      - main # The 'main' branch
       - 'releases/*' # The release branches
 
 jobs:
@@ -24,5 +24,5 @@ jobs:
         with:
           pr-mode: false
         env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_729101036 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
