@@ -135,7 +135,7 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 ### npm
 ```bash
-npm install @nskha/n8n-nodes-torbox
+npm install @n8n-nodes-torbox
 ```
 
 ### n8n Cloud & Self-Hosted
