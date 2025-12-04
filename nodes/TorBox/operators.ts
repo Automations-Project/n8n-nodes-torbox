@@ -10,18 +10,18 @@ export const torBoxResources: INodeProperties[] = [
 		noDataExpression: true,
 		default: 'torrents',
 		options: [
-			{ name: 'Torrents', value: 'torrents' },
+			{ name: 'Torrent', value: 'torrents' },
 			{ name: 'Usenet', value: 'usenet' },
-			{ name: 'Web Downloads', value: 'webdl' },
+			{ name: 'Web Download', value: 'webdl' },
 			{ name: 'General', value: 'general' },
-			{ name: 'Notifications', value: 'notifications' },
+			{ name: 'Notification', value: 'notifications' },
 			{ name: 'User', value: 'user' },
-			{ name: 'RSS Feeds', value: 'rss' },
-			{ name: 'Integrations', value: 'integrations' },
+			{ name: 'RSS Feed', value: 'rss' },
+			{ name: 'Integration', value: 'integrations' },
 			{ name: 'Queued', value: 'queued' },
 			{ name: 'Stream', value: 'stream' },
 			{ name: 'Search', value: 'search' },
-			{ name: 'Vendors', value: 'vendors' },
+			{ name: 'Vendor', value: 'vendors' },
 			{ name: 'Relay', value: 'relay' },
 		],
 	},
@@ -173,7 +173,7 @@ export const generalOperations: INodeProperties[] = [
 			{
 				name: 'Get Stats',
 				value: 'getStats',
-				action: 'Get TorBox stats',
+				action: 'Get tor box stats',
 			},
 			{
 				name: 'Get Changelogs RSS Feed',
@@ -315,32 +315,32 @@ export const integrationsOperations: INodeProperties[] = [
 			{
 				name: 'Authenticate OAuth',
 				value: 'authenticateOAuth',
-				action: 'Authenticate OAuth',
+				action: 'Authenticate o auth',
 			},
 			{
 				name: 'Queue Google Drive',
 				value: 'queueGoogleDrive',
-				action: 'Queue to Google Drive',
+				action: 'Queue to google drive',
 			},
 			{
 				name: 'Queue Pixeldrain',
 				value: 'queuePixeldrain',
-				action: 'Queue to Pixeldrain',
+				action: 'Queue to pixeldrain',
 			},
 			{
 				name: 'Queue OneDrive',
 				value: 'queueOneDrive',
-				action: 'Queue to OneDrive',
+				action: 'Queue to one drive',
 			},
 			{
 				name: 'Queue GoFile',
 				value: 'queueGoFile',
-				action: 'Queue to GoFile',
+				action: 'Queue to go file',
 			},
 			{
 				name: 'Queue 1Fichier',
 				value: 'queue1Fichier',
-				action: 'Queue to 1Fichier',
+				action: 'Queue to 1 fichier',
 			},
 			{
 				name: 'Get All Jobs',
@@ -482,12 +482,12 @@ export const vendorsOperations: INodeProperties[] = [
 			{
 				name: 'Get Vendor TorBox Accounts',
 				value: 'getVendorAccounts',
-				action: 'Get vendor TorBox accounts',
+				action: 'Get vendor tor box accounts',
 			},
 			{
 				name: 'Get Single Vendor TorBox Account',
 				value: 'getSingleVendorAccount',
-				action: 'Get single vendor TorBox account',
+				action: 'Get single vendor tor box account',
 			},
 			{
 				name: 'Register New User Under Vendor',

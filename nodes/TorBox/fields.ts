@@ -54,22 +54,11 @@ export const createTorrentFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['torrents'], operation: ['createTorrent'] } },
 		options: [
 			{
-				displayName: 'Name',
-				name: 'name',
-				type: 'string',
-				default: '',
-				description: 'Custom name for the torrent',
-			},
-			{
-				displayName: 'Seed Preference',
-				name: 'seed',
-				type: 'options',
-				default: 1,
-				options: [
-					{ name: 'Auto', value: 1 },
-					{ name: 'Always Seed', value: 2 },
-					{ name: 'Never Seed', value: 3 },
-				],
+				displayName: 'Add Only If Cached',
+				name: 'add_only_if_cached',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to only add if already cached on TorBox',
 			},
 			{
 				displayName: 'Allow Zip',
@@ -86,11 +75,22 @@ export const createTorrentFields: INodeProperties[] = [
 				description: 'Whether to instantly queue the torrent',
 			},
 			{
-				displayName: 'Add Only If Cached',
-				name: 'add_only_if_cached',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to only add if already cached on TorBox',
+				displayName: 'Name',
+				name: 'name',
+				type: 'string',
+				default: '',
+				description: 'Custom name for the torrent',
+			},
+			{
+				displayName: 'Seed Preference',
+				name: 'seed',
+				type: 'options',
+				default: 1,
+				options: [
+					{ name: 'Auto', value: 1 },
+					{ name: 'Always Seed', value: 2 },
+					{ name: 'Never Seed', value: 3 },
+				],
 			},
 		],
 	},
@@ -196,7 +196,11 @@ export const getTorrentListFields: INodeProperties[] = [
 				displayName: 'Limit',
 				name: 'limit',
 				type: 'number',
-				default: 1000,
+				typeOptions: {
+					minValue: 1,
+				},
+				description: 'Max number of results to return',
+				default: 50,
 			},
 		],
 	},
@@ -431,7 +435,11 @@ export const getUsenetListFields: INodeProperties[] = [
 				displayName: 'Limit',
 				name: 'limit',
 				type: 'number',
-				default: 1000,
+				typeOptions: {
+					minValue: 1,
+				},
+				description: 'Max number of results to return',
+				default: 50,
 			},
 		],
 	},
@@ -591,7 +599,11 @@ export const getWebDownloadListFields: INodeProperties[] = [
 				displayName: 'Limit',
 				name: 'limit',
 				type: 'number',
-				default: 1000,
+				typeOptions: {
+					minValue: 1,
+				},
+				description: 'Max number of results to return',
+				default: 50,
 			},
 		],
 	},
@@ -724,22 +736,17 @@ export const addRssFeedFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['rss'], operation: ['addRssFeed'] } },
 		options: [
 			{
-				displayName: 'RSS Type',
-				name: 'rss_type',
-				type: 'options',
-				default: 'torrent',
-				options: [
-					{ name: 'Torrent', value: 'torrent' },
-					{ name: 'Usenet', value: 'usenet' },
-					{ name: 'Web Download', value: 'webdl' },
-				],
-			},
-			{
 				displayName: 'Do Regex',
 				name: 'do_regex',
 				type: 'string',
 				default: '',
 				description: 'Regex of items you want to make sure are added',
+			},
+			{
+				displayName: 'Don\'t Older Than (Days)',
+				name: 'dont_older_than',
+				type: 'number',
+				default: 0,
 			},
 			{
 				displayName: 'Don\'t Regex',
@@ -749,10 +756,15 @@ export const addRssFeedFields: INodeProperties[] = [
 				description: 'Regex of items you don\'t want added',
 			},
 			{
-				displayName: 'Don\'t Older Than (Days)',
-				name: 'dont_older_than',
-				type: 'number',
-				default: 0,
+				displayName: 'RSS Type',
+				name: 'rss_type',
+				type: 'options',
+				default: 'torrent',
+				options: [
+					{ name: 'Torrent', value: 'torrent' },
+					{ name: 'Usenet', value: 'usenet' },
+					{ name: 'Web Download', value: 'webdl' },
+				],
 			},
 			{
 				displayName: 'Scan Interval (Minutes)',
@@ -811,7 +823,7 @@ export const modifyRssFeedFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['rss'], operation: ['modifyRssFeed'] } },
 	},
 	{
-		displayName: 'Fields To Update',
+		displayName: 'Update Fields',
 		name: 'updateFields',
 		type: 'collection',
 		placeholder: 'Add Field',
@@ -819,20 +831,8 @@ export const modifyRssFeedFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['rss'], operation: ['modifyRssFeed'] } },
 		options: [
 			{
-				displayName: 'Name',
-				name: 'name',
-				type: 'string',
-				default: '',
-			},
-			{
 				displayName: 'Do Regex',
 				name: 'do_regex',
-				type: 'string',
-				default: '',
-			},
-			{
-				displayName: 'Don\'t Regex',
-				name: 'dont_regex',
 				type: 'string',
 				default: '',
 			},
@@ -843,10 +843,16 @@ export const modifyRssFeedFields: INodeProperties[] = [
 				default: 0,
 			},
 			{
-				displayName: 'Scan Interval (Minutes)',
-				name: 'scan_interval',
-				type: 'number',
-				default: 60,
+				displayName: 'Don\'t Regex',
+				name: 'dont_regex',
+				type: 'string',
+				default: '',
+			},
+			{
+				displayName: 'Name',
+				name: 'name',
+				type: 'string',
+				default: '',
 			},
 			{
 				displayName: 'RSS Type',
@@ -858,6 +864,12 @@ export const modifyRssFeedFields: INodeProperties[] = [
 					{ name: 'Usenet', value: 'usenet' },
 					{ name: 'Web Download', value: 'webdl' },
 				],
+			},
+			{
+				displayName: 'Scan Interval (Minutes)',
+				name: 'scan_interval',
+				type: 'number',
+				default: 60,
 			},
 			{
 				displayName: 'Torrent Seeding',
@@ -1046,16 +1058,20 @@ export const getQueuedDownloadsFields: INodeProperties[] = [
 				default: 0,
 			},
 			{
+				displayName: 'Limit',
+				name: 'limit',
+				type: 'number',
+				typeOptions: {
+					minValue: 1,
+				},
+				description: 'Max number of results to return',
+				default: 50,
+			},
+			{
 				displayName: 'Offset',
 				name: 'offset',
 				type: 'number',
 				default: 0,
-			},
-			{
-				displayName: 'Limit',
-				name: 'limit',
-				type: 'number',
-				default: 1000,
 			},
 			{
 				displayName: 'Type',
@@ -1285,12 +1301,12 @@ export const getTorrentDataByIdFields: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['search'], operation: ['getTorrentDataById'] } },
 		options: [
-			{ displayName: 'Metadata', name: 'metadata', type: 'boolean', default: false },
-			{ displayName: 'Season', name: 'season', type: 'number', default: 0 },
-			{ displayName: 'Episode', name: 'episode', type: 'number', default: 0 },
 			{ displayName: 'Check Cache', name: 'check_cache', type: 'boolean', default: false },
 			{ displayName: 'Check Owned', name: 'check_owned', type: 'boolean', default: false },
+			{ displayName: 'Episode', name: 'episode', type: 'number', default: 0 },
+			{ displayName: 'Metadata', name: 'metadata', type: 'boolean', default: false },
 			{ displayName: 'Search User Engines', name: 'search_user_engines', type: 'boolean', default: false },
+			{ displayName: 'Season', name: 'season', type: 'number', default: 0 },
 		],
 	},
 ];
@@ -1351,12 +1367,12 @@ export const getUsenetDataByIdFields: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['search'], operation: ['getUsenetDataById'] } },
 		options: [
-			{ displayName: 'Metadata', name: 'metadata', type: 'boolean', default: false },
-			{ displayName: 'Season', name: 'season', type: 'number', default: 0 },
-			{ displayName: 'Episode', name: 'episode', type: 'number', default: 0 },
 			{ displayName: 'Check Cache', name: 'check_cache', type: 'boolean', default: false },
 			{ displayName: 'Check Owned', name: 'check_owned', type: 'boolean', default: false },
+			{ displayName: 'Episode', name: 'episode', type: 'number', default: 0 },
+			{ displayName: 'Metadata', name: 'metadata', type: 'boolean', default: false },
 			{ displayName: 'Search User Engines', name: 'search_user_engines', type: 'boolean', default: false },
+			{ displayName: 'Season', name: 'season', type: 'number', default: 0 },
 		],
 	},
 ];
@@ -1378,12 +1394,12 @@ export const getUsenetDataByQueryFields: INodeProperties[] = [
 		default: {},
 		displayOptions: { show: { resource: ['search'], operation: ['getUsenetDataByQuery'] } },
 		options: [
-			{ displayName: 'Metadata', name: 'metadata', type: 'boolean', default: false },
-			{ displayName: 'Season', name: 'season', type: 'number', default: 0 },
-			{ displayName: 'Episode', name: 'episode', type: 'number', default: 0 },
 			{ displayName: 'Check Cache', name: 'check_cache', type: 'boolean', default: false },
 			{ displayName: 'Check Owned', name: 'check_owned', type: 'boolean', default: false },
+			{ displayName: 'Episode', name: 'episode', type: 'number', default: 0 },
+			{ displayName: 'Metadata', name: 'metadata', type: 'boolean', default: false },
 			{ displayName: 'Search User Engines', name: 'search_user_engines', type: 'boolean', default: false },
+			{ displayName: 'Season', name: 'season', type: 'number', default: 0 },
 		],
 	},
 ];
@@ -1436,7 +1452,11 @@ export const getVendorAccountsFields: INodeProperties[] = [
 		displayOptions: { show: { resource: ['vendors'], operation: ['getVendorAccounts'] } },
 		options: [
 			{ displayName: 'Offset', name: 'offset', type: 'number', default: 0 },
-			{ displayName: 'Limit', name: 'limit', type: 'number', default: 100 },
+			{ displayName: 'Limit', name: 'limit', type: 'number',
+																																										typeOptions: {
+																																											minValue: 1,
+																																										},
+																																										description: 'Max number of results to return', default: 50 },
 		],
 	},
 ];
@@ -1457,6 +1477,7 @@ export const registerUserUnderVendorFields: INodeProperties[] = [
 		displayName: 'Email',
 		name: 'email',
 		type: 'string',
+		placeholder: 'name@email.com',
 		default: '',
 		required: true,
 		displayOptions: { show: { resource: ['vendors'], operation: ['registerUserUnderVendor'] } },

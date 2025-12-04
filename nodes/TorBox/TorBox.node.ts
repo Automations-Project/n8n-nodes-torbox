@@ -4,7 +4,6 @@ import {
 	INodeTypeDescription,
 	IExecuteFunctions,
 	INodeExecutionData,
-	NodeConnectionType,
 } from 'n8n-workflow';
 import {
 	torBoxResources,
@@ -88,8 +87,8 @@ export class TorBox implements INodeType {
 		defaults: {
 			name: 'TorBox',
 		},
-		inputs: [NodeConnectionType.Main],
-		outputs: [NodeConnectionType.Main],
+		inputs: ['main'],
+		outputs: ['main'],
 		credentials: [
 			{
 				name: 'torBoxApi',
