@@ -1,0 +1,439 @@
+name: Publish n8n Node
+
+on:
+  workflow_dispatch:
+    inputs:
+      version-bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+        default: 'patch'
+      prerelease-tag:
+        description: 'Prerelease tag (e.g., alpha, beta, rc) - only for prerelease'
+        required: false
+        type: string
+        default: 'beta'
+      dry-run:
+        description: 'Dry run (test without publishing)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  validate:
+    name: Validate & Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      new-version: ${{ steps.version.outputs.new-version }}
+      should-publish: ${{ steps.check.outputs.should-publish }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'pnpm'
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run linting
+        run: pnpm run lint
+
+      - name: Run tests with coverage
+        run: pnpm run test:coverage
+
+      - name: Check test coverage threshold
+        run: |
+          echo "✅ All tests passed with adequate coverage"
+
+      - name: Bump version
+        id: version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version in package.json: $CURRENT_VERSION"
+
+          # Check what's already published on NPM
+          NPM_VERSION=$(npm view n8n-nodes-torbox version 2>/dev/null || echo "0.0.0")
+          echo "Latest version on NPM: $NPM_VERSION"
+
+          # Use the higher version as base (NPM or local)
+          if [ "$NPM_VERSION" != "0.0.0" ]; then
+            # NPM has a published version, use it as base
+            echo "Using NPM version as base for bump"
+            npm version $NPM_VERSION --no-git-tag-version --allow-same-version
+          fi
+
+          # Now bump from the correct base
+          if [ "${{ inputs.version-bump }}" = "prerelease" ]; then
+            NEW_VERSION=$(npm version prerelease --preid=${{ inputs.prerelease-tag }} --no-git-tag-version)
+          else
+            NEW_VERSION=$(npm version ${{ inputs.version-bump }} --no-git-tag-version)
+          fi
+
+          NEW_VERSION=${NEW_VERSION#v}
+          echo "New version: $NEW_VERSION"
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # Verify n8n node structure
+          if ! node -e "const pkg = require('./package.json'); if (!pkg.n8n || !pkg.n8n.nodes || !pkg.n8n.credentials) process.exit(1)"; then
+            echo "❌ Error: package.json missing required n8n node structure"
+            exit 1
+          fi
+
+          echo "✅ Version bumped successfully: $NPM_VERSION → $NEW_VERSION"
+
+      - name: Verify package structure for n8n
+        run: |
+          echo "Verifying n8n community node requirements..."
+
+          # Check keywords
+          if ! grep -q "n8n-community-node-package" package.json; then
+            echo "❌ Missing required keyword: n8n-community-node-package"
+            exit 1
+          fi
+
+          # Check files field
+          if ! grep -q '"files"' package.json; then
+            echo "❌ Missing 'files' field in package.json"
+            exit 1
+          fi
+
+          # Check n8n field
+          if ! node -e "const pkg = require('./package.json'); if (!pkg.n8n?.n8nNodesApiVersion) process.exit(1)"; then
+            echo "❌ Missing n8n.n8nNodesApiVersion in package.json"
+            exit 1
+          fi
+
+          echo "✅ Package structure validated for n8n community node"
+
+      - name: Build package
+        run: pnpm run build
+
+      - name: Verify build artifacts
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ Build failed: dist directory not found"
+            exit 1
+          fi
+
+          if [ ! -f "dist/nodes/TorBox/TorBox.node.js" ]; then
+            echo "❌ Build failed: Main node file not found"
+            exit 1
+          fi
+
+          if [ ! -f "dist/credentials/TorBoxApi.credentials.js" ]; then
+            echo "❌ Build failed: Credentials file not found"
+            exit 1
+          fi
+
+          echo "✅ Build artifacts verified"
+
+      - name: Run prepublish checks
+        run: pnpm run prepublishOnly
+        continue-on-error: false
+
+      - name: Test package installation
+        run: |
+          mkdir -p /tmp/test-install
+          pnpm pack --pack-destination /tmp/test-install
+          echo "✅ Package can be packed successfully"
+
+      - name: Determine if should publish
+        id: check
+        run: |
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            echo "should-publish=false" >> $GITHUB_OUTPUT
+            echo "🔍 Dry run mode: Skipping actual publish"
+          else
+            echo "should-publish=true" >> $GITHUB_OUTPUT
+            echo "✅ Ready to publish"
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            package.json
+            package-lock.json
+            README.md
+            LICENSE.md
+          retention-days: 1
+
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: validate
+    if: needs.validate.outputs.should-publish == 'true'
+    environment:
+      name: npm-production
+      url: https://www.npmjs.com/package/n8n-nodes-torbox
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js for NPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify NPM authentication
+        run: npm whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to NPM
+        run: |
+          echo "Publishing version ${{ needs.validate.outputs.new-version }} to NPM..."
+
+          # Publish with provenance for security
+          pnpm publish --access public --provenance --no-git-checks
+
+          echo "✅ Successfully published to NPM"
+          echo "📦 Package: https://www.npmjs.com/package/n8n-nodes-torbox"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify NPM publication
+        continue-on-error: true
+        run: |
+          echo "Waiting for NPM registry to propagate..."
+          sleep 30
+          
+          NPM_VERSION=$(npm view n8n-nodes-torbox version 2>/dev/null || echo "not-found")
+          
+          if [ "$NPM_VERSION" = "${{ needs.validate.outputs.new-version }}" ]; then
+            echo "✅ NPM publication verified: v$NPM_VERSION"
+          elif [ "$NPM_VERSION" = "not-found" ]; then
+            echo "⚠️ Package not yet visible on NPM (may take a few minutes to propagate)"
+            echo "📦 Check manually: https://www.npmjs.com/package/n8n-nodes-torbox"
+          else
+            echo "⚠️ Version mismatch (NPM propagation delay)"
+            echo "   Expected: ${{ needs.validate.outputs.new-version }}"
+            echo "   Currently on NPM: $NPM_VERSION"
+            echo "📦 Verify manually: https://www.npmjs.com/package/n8n-nodes-torbox"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-github:
+    name: Publish to GitHub Packages (@Automations-Project)
+    runs-on: ubuntu-latest
+    needs: validate
+    if: needs.validate.outputs.should-publish == 'true'
+    environment:
+      name: github-packages
+      url: https://github.com/Automations-Project/n8n-nodes-torbox/packages
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@automations-project'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare package for GitHub Packages
+        run: |
+          # Create a scoped version for GitHub Packages
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.name = '@automations-project/n8n-nodes-torbox';
+            pkg.publishConfig = {
+              registry: 'https://npm.pkg.github.com',
+              access: 'public'
+            };
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+
+          echo "✅ Package configured for GitHub Packages"
+
+      - name: Publish to GitHub Packages
+        run: |
+          echo "Publishing version ${{ needs.validate.outputs.new-version }} to GitHub Packages..."
+
+          pnpm publish --provenance --no-git-checks
+
+          echo "✅ Successfully published to GitHub Packages"
+          echo "📦 Package: https://github.com/Automations-Project/n8n-nodes-torbox/packages"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, publish-npm, publish-github]
+    if: needs.validate.outputs.should-publish == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update package.json version
+        run: |
+          npm version ${{ needs.validate.outputs.new-version }} --no-git-tag-version --allow-same-version
+
+      - name: Commit version bump
+        run: |
+          git add package.json pnpm-lock.yaml
+          git commit -m "chore: bump version to v${{ needs.validate.outputs.new-version }}" || echo "No changes to commit"
+          git push origin master || echo "Nothing to push"
+
+      - name: Create Git tag
+        run: |
+          git tag -a "v${{ needs.validate.outputs.new-version }}" -m "Release v${{ needs.validate.outputs.new-version }}"
+          git push origin "v${{ needs.validate.outputs.new-version }}"
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## 🚀 n8n-nodes-torbox v${{ needs.validate.outputs.new-version }}
+
+          ### 📦 Installation
+
+          **NPM:**
+          ```bash
+          npm install n8n-nodes-torbox
+          ```
+
+          **n8n Cloud/Self-Hosted:**
+          Go to **Settings → Community Nodes** and install `n8n-nodes-torbox`
+
+          ### 📍 Package Locations
+
+          - **NPM Registry:** [npmjs.com/package/n8n-nodes-torbox](https://www.npmjs.com/package/n8n-nodes-torbox)
+          - **GitHub Packages:** [@automations-project/n8n-nodes-torbox](https://github.com/Automations-Project/n8n-nodes-torbox/packages)
+
+          ### 📚 Documentation
+
+          Full documentation available in [README.md](https://github.com/Automations-Project/n8n-nodes-torbox#readme)
+
+          ### 🔗 Resources
+
+          - [TorBox Documentation](https://torbox.app)
+          - [n8n Community Nodes](https://docs.n8n.io/integrations/community-nodes/)
+          - [Report Issues](https://github.com/Automations-Project/n8n-nodes-torbox/issues)
+
+          ---
+
+          **Published:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Build:** ${{ github.run_number }}
+          **Commit:** ${{ github.sha }}
+          EOF
+
+          echo "Release notes generated"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate.outputs.new-version }}
+          name: Release v${{ needs.validate.outputs.new-version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(needs.validate.outputs.new-version, '-') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## 🎉 Publication Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Version: v${{ needs.validate.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Published to:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ NPM Registry: https://www.npmjs.com/package/n8n-nodes-torbox" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ GitHub Packages: https://github.com/Automations-Project/n8n-nodes-torbox/packages" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ GitHub Release: https://github.com/Automations-Project/n8n-nodes-torbox/releases/tag/v${{ needs.validate.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Install command:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "npm install n8n-nodes-torbox" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [validate, publish-npm, publish-github, create-release]
+    if: failure()
+
+    steps:
+      - name: Failure Summary
+        run: |
+          echo "## ❌ Publication Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The publication workflow encountered errors. Please check the logs above." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

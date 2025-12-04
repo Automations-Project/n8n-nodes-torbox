@@ -7,3 +7,5 @@ npm-debug.log*
 yarn.lock
 .vscode
 .windsurf
+scripts
+ecosystem.config.js
