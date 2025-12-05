@@ -23,15 +23,13 @@ async function torBoxApiRequest(
 		headers: Record<string, string>;
 		qs?: IDataObject;
 		body?: IDataObject;
-		uri: string;
-		json: boolean;
+		url: string;
 	} = {
 		method,
 		headers: {
 			Authorization: `Bearer ${credentials.apiKey}`,
 		},
-		uri: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
-		json: true,
+		url: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
 	};
 
 	if (qs && Object.keys(qs).length > 0) {
@@ -42,7 +40,7 @@ async function torBoxApiRequest(
 		options.body = body;
 	}
 
-	const response = await this.helpers.request(options);
+	const response = await this.helpers.httpRequest(options);
 	
 	if (!response.success) {
 		throw new NodeApiError(this.getNode(), response, {
@@ -60,14 +58,14 @@ async function torBoxApiRequestFormData(
 ): Promise<TorBoxResponse> {
 	const credentials = await this.getCredentials('torBoxApi');
 	
-	const response = await this.helpers.request({
+	const response = await this.helpers.httpRequest({
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${credentials.apiKey}`,
+			'Content-Type': 'multipart/form-data',
 		},
-		uri: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
-		formData: formData as unknown as IDataObject,
-		json: true,
+		url: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
+		body: formData,
 	});
 
 	if (!response.success) {
@@ -333,11 +331,10 @@ export async function getHosterList(this: IExecuteFunctions) {
 
 export async function getUpStatus(this: IExecuteFunctions) {
 	const credentials = await this.getCredentials('torBoxApi');
-	const response = await this.helpers.request({
+	const response = await this.helpers.httpRequest({
 		method: 'GET',
 		headers: { Authorization: `Bearer ${credentials.apiKey}` },
-		uri: API_BASE,
-		json: true,
+		url: API_BASE,
 	});
 	return response;
 }
@@ -633,14 +630,13 @@ async function searchApiRequest(
 ): Promise<unknown> {
 	const credentials = await this.getCredentials('torBoxApi');
 	
-	const response = await this.helpers.request({
+	const response = await this.helpers.httpRequest({
 		method: 'GET',
 		headers: {
 			Authorization: `Bearer ${credentials.apiKey}`,
 		},
-		uri: `${SEARCH_API_BASE}/${endpoint}`,
+		url: `${SEARCH_API_BASE}/${endpoint}`,
 		qs,
-		json: true,
 	});
 
 	return response;
@@ -788,12 +784,10 @@ export async function refreshUserAccounts(this: IExecuteFunctions, i: number) {
 const RELAY_API_BASE = 'https://relay.torbox.app';
 
 export async function getCurrentUsersOnline(this: IExecuteFunctions) {
-	const response = await this.helpers.request({
+	const response = await this.helpers.httpRequest({
 		method: 'GET',
-		uri: RELAY_API_BASE,
-		json: true,
+		url: RELAY_API_BASE,
 	});
-
 	return response;
 }
 
@@ -801,11 +795,9 @@ export async function requestUpdateOnTorrentInfo(this: IExecuteFunctions, i: num
 	const userId = this.getNodeParameter('user_id', i) as number;
 	const torrentId = this.getNodeParameter('torrent_id', i) as number;
 
-	const response = await this.helpers.request({
+	const response = await this.helpers.httpRequest({
 		method: 'GET',
-		uri: `${RELAY_API_BASE}/v1/inactivecheck/torrent/${userId}/${torrentId}`,
-		json: true,
+		url: `${RELAY_API_BASE}/v1/inactivecheck/torrent/${userId}/${torrentId}`,
 	});
-
 	return response;
 }
