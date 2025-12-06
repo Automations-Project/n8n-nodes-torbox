@@ -54,7 +54,7 @@ async function torBoxApiRequest(
 async function torBoxApiRequestFormData(
 	this: IExecuteFunctions,
 	endpoint: string,
-	formData: IDataObject,
+	formData: Record<string, unknown>,
 ): Promise<TorBoxResponse> {
 	const credentials = await this.getCredentials('torBoxApi');
 	
@@ -62,19 +62,22 @@ async function torBoxApiRequestFormData(
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${credentials.apiKey}`,
-			'Content-Type': 'multipart/form-data',
 		},
 		url: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
 		body: formData,
+		json: false,
 	});
 
-	if (!response.success) {
-		throw new NodeApiError(this.getNode(), response, {
-			message: response.detail || 'TorBox API request failed',
+	// Parse response if it's a string
+	const parsedResponse = typeof response === 'string' ? JSON.parse(response) : response;
+
+	if (!parsedResponse.success) {
+		throw new NodeApiError(this.getNode(), parsedResponse, {
+			message: parsedResponse.detail || 'TorBox API request failed',
 		});
 	}
 
-	return response;
+	return parsedResponse;
 }
 
 // =====================
@@ -85,18 +88,19 @@ export async function createTorrent(this: IExecuteFunctions, i: number) {
 	const inputType = this.getNodeParameter('inputType', i) as string;
 	const options = this.getNodeParameter('options', i, {}) as IDataObject;
 	
-	const formData: IDataObject = {};
+	const formData: Record<string, unknown> = {};
 
 	if (inputType === 'magnet') {
 		formData.magnet = this.getNodeParameter('magnet', i) as string;
 	} else {
 		const binaryPropertyName = this.getNodeParameter('file', i) as string;
 		const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+		const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
 		formData.file = {
-			value: Buffer.from(binaryData.data, 'base64'),
+			value: buffer,
 			options: {
 				filename: binaryData.fileName || 'file.torrent',
-				contentType: binaryData.mimeType,
+				contentType: binaryData.mimeType || 'application/x-bittorrent',
 			},
 		};
 	}
@@ -189,18 +193,19 @@ export async function createUsenetDownload(this: IExecuteFunctions, i: number) {
 	const inputType = this.getNodeParameter('inputType', i) as string;
 	const options = this.getNodeParameter('options', i, {}) as IDataObject;
 	
-	const formData: IDataObject = {};
+	const formData: Record<string, unknown> = {};
 
 	if (inputType === 'link') {
 		formData.link = this.getNodeParameter('link', i) as string;
 	} else {
 		const binaryPropertyName = this.getNodeParameter('file', i) as string;
 		const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+		const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
 		formData.file = {
-			value: Buffer.from(binaryData.data, 'base64'),
+			value: buffer,
 			options: {
 				filename: binaryData.fileName || 'file.nzb',
-				contentType: binaryData.mimeType,
+				contentType: binaryData.mimeType || 'application/x-nzb',
 			},
 		};
 	}
