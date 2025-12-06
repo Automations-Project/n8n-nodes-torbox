@@ -1,4 +1,5 @@
 import { IExecuteFunctions, IHttpRequestMethods, IDataObject, NodeApiError } from 'n8n-workflow';
+import FormData from 'form-data';
 
 const API_BASE = 'https://api.torbox.app';
 const API_VERSION = 'v1';
@@ -54,18 +55,36 @@ async function torBoxApiRequest(
 async function torBoxApiRequestFormData(
 	this: IExecuteFunctions,
 	endpoint: string,
-	formData: Record<string, unknown>,
+	formDataFields: Record<string, unknown>,
+	fileField?: { fieldName: string; buffer: Buffer; filename: string; contentType: string },
 ): Promise<TorBoxResponse> {
 	const credentials = await this.getCredentials('torBoxApi');
+	
+	const form = new FormData();
+	
+	// Add file field if present
+	if (fileField) {
+		form.append(fileField.fieldName, fileField.buffer, {
+			filename: fileField.filename,
+			contentType: fileField.contentType,
+		});
+	}
+	
+	// Add other form fields
+	for (const [key, value] of Object.entries(formDataFields)) {
+		if (value !== undefined && value !== null) {
+			form.append(key, String(value));
+		}
+	}
 	
 	const response = await this.helpers.httpRequest({
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${credentials.apiKey}`,
+			...form.getHeaders(),
 		},
 		url: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
-		body: formData,
-		json: false,
+		body: form,
 	});
 
 	// Parse response if it's a string
@@ -89,6 +108,7 @@ export async function createTorrent(this: IExecuteFunctions, i: number) {
 	const options = this.getNodeParameter('options', i, {}) as IDataObject;
 	
 	const formData: Record<string, unknown> = {};
+	let fileField: { fieldName: string; buffer: Buffer; filename: string; contentType: string } | undefined;
 
 	if (inputType === 'magnet') {
 		formData.magnet = this.getNodeParameter('magnet', i) as string;
@@ -96,12 +116,11 @@ export async function createTorrent(this: IExecuteFunctions, i: number) {
 		const binaryPropertyName = this.getNodeParameter('file', i) as string;
 		const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 		const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-		formData.file = {
-			value: buffer,
-			options: {
-				filename: binaryData.fileName || 'file.torrent',
-				contentType: binaryData.mimeType || 'application/x-bittorrent',
-			},
+		fileField = {
+			fieldName: 'file',
+			buffer,
+			filename: binaryData.fileName || 'file.torrent',
+			contentType: binaryData.mimeType || 'application/x-bittorrent',
 		};
 	}
 
@@ -111,7 +130,7 @@ export async function createTorrent(this: IExecuteFunctions, i: number) {
 	if (options.as_queued !== undefined) formData.as_queued = options.as_queued;
 	if (options.add_only_if_cached !== undefined) formData.add_only_if_cached = options.add_only_if_cached;
 
-	return torBoxApiRequestFormData.call(this, 'torrents/createtorrent', formData);
+	return torBoxApiRequestFormData.call(this, 'torrents/createtorrent', formData, fileField);
 }
 
 export async function controlTorrent(this: IExecuteFunctions, i: number) {
@@ -194,6 +213,7 @@ export async function createUsenetDownload(this: IExecuteFunctions, i: number) {
 	const options = this.getNodeParameter('options', i, {}) as IDataObject;
 	
 	const formData: Record<string, unknown> = {};
+	let fileField: { fieldName: string; buffer: Buffer; filename: string; contentType: string } | undefined;
 
 	if (inputType === 'link') {
 		formData.link = this.getNodeParameter('link', i) as string;
@@ -201,19 +221,18 @@ export async function createUsenetDownload(this: IExecuteFunctions, i: number) {
 		const binaryPropertyName = this.getNodeParameter('file', i) as string;
 		const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
 		const buffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-		formData.file = {
-			value: buffer,
-			options: {
-				filename: binaryData.fileName || 'file.nzb',
-				contentType: binaryData.mimeType || 'application/x-nzb',
-			},
+		fileField = {
+			fieldName: 'file',
+			buffer,
+			filename: binaryData.fileName || 'file.nzb',
+			contentType: binaryData.mimeType || 'application/x-nzb',
 		};
 	}
 
 	if (options.name) formData.name = options.name;
 	if (options.as_queued !== undefined) formData.as_queued = options.as_queued;
 
-	return torBoxApiRequestFormData.call(this, 'usenet/createusenetdownload', formData);
+	return torBoxApiRequestFormData.call(this, 'usenet/createusenetdownload', formData, fileField);
 }
 
 export async function controlUsenetDownload(this: IExecuteFunctions, i: number) {
