@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-torbox",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "TorBox community node for n8n: debrid, torrents, usenet, web downloads, and cloud integrations.",
   "keywords": [
     "n8n-community-node-package",
