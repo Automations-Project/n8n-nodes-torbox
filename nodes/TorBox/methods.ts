@@ -45,43 +45,78 @@ async function torBoxApiRequest(
 	return response;
 }
 
+/**
+ * Creates a multipart/form-data body without external dependencies.
+ * Returns { body: Buffer, boundary: string }
+ */
+function createMultipartFormData(
+	fields: Record<string, string>,
+	fileField?: { fieldName: string; buffer: Buffer; filename: string; contentType: string },
+): { body: Buffer; boundary: string } {
+	const boundary = `----n8nFormBoundary${Date.now().toString(16)}`;
+	const parts: Buffer[] = [];
+
+	// Add regular text fields
+	for (const [key, value] of Object.entries(fields)) {
+		parts.push(
+			Buffer.from(
+				`--${boundary}\r\n` +
+				`Content-Disposition: form-data; name="${key}"\r\n\r\n` +
+				`${value}\r\n`,
+			),
+		);
+	}
+
+	// Add file field if present
+	if (fileField) {
+		parts.push(
+			Buffer.from(
+				`--${boundary}\r\n` +
+				`Content-Disposition: form-data; name="${fileField.fieldName}"; filename="${fileField.filename}"\r\n` +
+				`Content-Type: ${fileField.contentType}\r\n\r\n`,
+			),
+		);
+		parts.push(fileField.buffer);
+		parts.push(Buffer.from('\r\n'));
+	}
+
+	// Add closing boundary
+	parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+	return {
+		body: Buffer.concat(parts),
+		boundary,
+	};
+}
+
 async function torBoxApiRequestFormData(
 	this: IExecuteFunctions,
 	endpoint: string,
 	formDataFields: Record<string, unknown>,
 	fileField?: { fieldName: string; buffer: Buffer; filename: string; contentType: string },
 ): Promise<TorBoxResponse> {
-	// Build multipart body using the formData approach supported by requestWithAuthentication
-	const formData: Record<string, unknown> = {};
-
-	// Add file field if present (using the value/options format for multipart)
-	if (fileField) {
-		formData[fileField.fieldName] = {
-			value: fileField.buffer,
-			options: {
-				filename: fileField.filename,
-				contentType: fileField.contentType,
-			},
-		};
-	}
-
-	// Add other form fields
+	// Convert form fields to strings
+	const stringFields: Record<string, string> = {};
 	for (const [key, value] of Object.entries(formDataFields)) {
 		if (value !== undefined && value !== null) {
-			formData[key] = String(value);
+			stringFields[key] = String(value);
 		}
 	}
 
-	// Use requestWithAuthentication which supports formData property (IRequestOptions)
-	// Unlike httpRequestWithAuthentication which only supports IHttpRequestOptions
-	const response = await this.helpers.requestWithAuthentication.call(
+	// Build multipart body natively (no external dependencies)
+	const { body, boundary } = createMultipartFormData(stringFields, fileField);
+
+	// Use httpRequestWithAuthentication with raw Buffer body
+	const response = await this.helpers.httpRequestWithAuthentication.call(
 		this,
 		'torBoxApi',
 		{
 			method: 'POST',
-			uri: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
-			formData: formData as IDataObject,
-			json: true,
+			url: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
+			body,
+			headers: {
+				'Content-Type': `multipart/form-data; boundary=${boundary}`,
+			},
 		},
 	);
 
