@@ -1,13 +1,78 @@
-node_modules
-.DS_Store
+# -----------------------------------------------------------------------------
+# REVERSED GITIGNORE (Allowlist)
+# Usage: Ignore everything by default, then explicitly allow files/directories.
+# -----------------------------------------------------------------------------
+
+# 1. Ignore everything in the root directory
+/*
+
+# 2. General Exclusions (Apply even inside allowed directories)
+#    These safeguard against tracking junk files if they appear in allowed folders.
+node_modules/
+dist/
+coverage/
+.nyc_output/
 .tmp
-tmp
-dist
+tmp/
+*.tmp
+*.log
 npm-debug.log*
-yarn.lock
-.vscode
-.windsurf
-scripts
-ecosystem.config.js
-TorBox APIs
-.vscode
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+hs_err_pid*.log
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+.npmrc
+.idea/
+.vscode/
+.windsurf/
+.junie/
+.n8n-docs/
+.PublishKey
+
+# -----------------------------------------------------------------------------
+# 3. ALLOWLIST - Files and Directories to Keep
+# -----------------------------------------------------------------------------
+
+# Configuration Files
+!/.editorconfig
+!/.eslintrc.js
+!/.eslintrc.prepublish.js
+!/.gitignore
+!/.npmignore
+!/.prettierrc.js
+!/tsconfig.json
+!/tslint.json
+
+# Documentation
+!/CHANGELOG.md
+!/CODE_OF_CONDUCT.md
+!/LICENSE
+!/README.md
+!/intro.png
+
+# Project Source & Dependencies
+!/gulpfile.js
+!/index.js
+!/package.json
+!/pnpm-lock.yaml
+
+# Core Directories
+!/credentials/
+!/nodes/
+!/.github/
+
+# Scripts (Selective)
+!/scripts/
+# Re-ignore everything inside scripts to only allow specific ones
+/scripts/*
+!/scripts/update-banner.js
+!/scripts/banner.config
