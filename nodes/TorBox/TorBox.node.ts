@@ -95,13 +95,6 @@ export class TorBox implements INodeType {
 				required: true,
 			},
 		],
-		requestDefaults: {
-			baseURL: 'https://api.torbox.app/v1/api',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-			},
-		},
 		properties: [
 			...torBoxResources,
 			...torrentsOperations,

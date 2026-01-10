@@ -10,3 +10,4 @@ yarn.lock
 scripts
 ecosystem.config.js
 TorBox APIs
+.vscode

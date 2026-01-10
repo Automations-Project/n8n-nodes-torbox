@@ -1,5 +1,4 @@
-import { IExecuteFunctions, IHttpRequestMethods, IDataObject, NodeApiError } from 'n8n-workflow';
-import FormData from 'form-data';
+import { IExecuteFunctions, IHttpRequestMethods, IDataObject, IHttpRequestOptions, NodeApiError } from 'n8n-workflow';
 
 const API_BASE = 'https://api.torbox.app';
 const API_VERSION = 'v1';
@@ -18,18 +17,8 @@ async function torBoxApiRequest(
 	body?: IDataObject,
 	qs?: IDataObject,
 ): Promise<TorBoxResponse> {
-	const credentials = await this.getCredentials('torBoxApi');
-	const options: {
-		method: IHttpRequestMethods;
-		headers: Record<string, string>;
-		qs?: IDataObject;
-		body?: IDataObject;
-		url: string;
-	} = {
+	const options: IHttpRequestOptions = {
 		method,
-		headers: {
-			Authorization: `Bearer ${credentials.apiKey}`,
-		},
 		url: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
 	};
 
@@ -41,8 +30,12 @@ async function torBoxApiRequest(
 		options.body = body;
 	}
 
-	const response = await this.helpers.httpRequest(options);
-	
+	const response = await this.helpers.httpRequestWithAuthentication.call(
+		this,
+		'torBoxApi',
+		options,
+	);
+
 	if (!response.success) {
 		throw new NodeApiError(this.getNode(), response, {
 			message: response.detail || 'TorBox API request failed',
@@ -58,34 +51,39 @@ async function torBoxApiRequestFormData(
 	formDataFields: Record<string, unknown>,
 	fileField?: { fieldName: string; buffer: Buffer; filename: string; contentType: string },
 ): Promise<TorBoxResponse> {
-	const credentials = await this.getCredentials('torBoxApi');
-	
-	const form = new FormData();
-	
-	// Add file field if present
+	// Build multipart body using the formData approach supported by requestWithAuthentication
+	const formData: Record<string, unknown> = {};
+
+	// Add file field if present (using the value/options format for multipart)
 	if (fileField) {
-		form.append(fileField.fieldName, fileField.buffer, {
-			filename: fileField.filename,
-			contentType: fileField.contentType,
-		});
+		formData[fileField.fieldName] = {
+			value: fileField.buffer,
+			options: {
+				filename: fileField.filename,
+				contentType: fileField.contentType,
+			},
+		};
 	}
-	
+
 	// Add other form fields
 	for (const [key, value] of Object.entries(formDataFields)) {
 		if (value !== undefined && value !== null) {
-			form.append(key, String(value));
+			formData[key] = String(value);
 		}
 	}
-	
-	const response = await this.helpers.httpRequest({
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${credentials.apiKey}`,
-			...form.getHeaders(),
+
+	// Use requestWithAuthentication which supports formData property (IRequestOptions)
+	// Unlike httpRequestWithAuthentication which only supports IHttpRequestOptions
+	const response = await this.helpers.requestWithAuthentication.call(
+		this,
+		'torBoxApi',
+		{
+			method: 'POST',
+			uri: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
+			formData: formData as IDataObject,
+			json: true,
 		},
-		url: `${API_BASE}/${API_VERSION}/api/${endpoint}`,
-		body: form,
-	});
+	);
 
 	// Parse response if it's a string
 	const parsedResponse = typeof response === 'string' ? JSON.parse(response) : response;
@@ -106,7 +104,7 @@ async function torBoxApiRequestFormData(
 export async function createTorrent(this: IExecuteFunctions, i: number) {
 	const inputType = this.getNodeParameter('inputType', i) as string;
 	const options = this.getNodeParameter('options', i, {}) as IDataObject;
-	
+
 	const formData: Record<string, unknown> = {};
 	let fileField: { fieldName: string; buffer: Buffer; filename: string; contentType: string } | undefined;
 
@@ -211,7 +209,7 @@ export async function getTorrentInfo(this: IExecuteFunctions, i: number) {
 export async function createUsenetDownload(this: IExecuteFunctions, i: number) {
 	const inputType = this.getNodeParameter('inputType', i) as string;
 	const options = this.getNodeParameter('options', i, {}) as IDataObject;
-	
+
 	const formData: Record<string, unknown> = {};
 	let fileField: { fieldName: string; buffer: Buffer; filename: string; contentType: string } | undefined;
 
@@ -289,7 +287,7 @@ export async function getUsenetCachedAvailability(this: IExecuteFunctions, i: nu
 export async function createWebDownload(this: IExecuteFunctions, i: number) {
 	const link = this.getNodeParameter('link', i) as string;
 	const options = this.getNodeParameter('options', i, {}) as IDataObject;
-	
+
 	const formData: IDataObject = { link };
 
 	if (options.name) formData.name = options.name;
@@ -354,12 +352,14 @@ export async function getHosterList(this: IExecuteFunctions) {
 // =====================
 
 export async function getUpStatus(this: IExecuteFunctions) {
-	const credentials = await this.getCredentials('torBoxApi');
-	const response = await this.helpers.httpRequest({
-		method: 'GET',
-		headers: { Authorization: `Bearer ${credentials.apiKey}` },
-		url: API_BASE,
-	});
+	const response = await this.helpers.httpRequestWithAuthentication.call(
+		this,
+		'torBoxApi',
+		{
+			method: 'GET',
+			url: API_BASE,
+		},
+	);
 	return response;
 }
 
@@ -652,16 +652,20 @@ async function searchApiRequest(
 	endpoint: string,
 	qs?: IDataObject,
 ): Promise<unknown> {
-	const credentials = await this.getCredentials('torBoxApi');
-	
-	const response = await this.helpers.httpRequest({
+	const options: IHttpRequestOptions = {
 		method: 'GET',
-		headers: {
-			Authorization: `Bearer ${credentials.apiKey}`,
-		},
 		url: `${SEARCH_API_BASE}/${endpoint}`,
-		qs,
-	});
+	};
+
+	if (qs && Object.keys(qs).length > 0) {
+		options.qs = qs;
+	}
+
+	const response = await this.helpers.httpRequestWithAuthentication.call(
+		this,
+		'torBoxApi',
+		options,
+	);
 
 	return response;
 }
